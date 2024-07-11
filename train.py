@@ -23,7 +23,6 @@ os.system('echo $CUDA_VISIBLE_DEVICES')
 import torch
 import torchvision
 import json
-import wandb
 import time
 from os import makedirs
 import shutil
@@ -233,9 +232,6 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
         tb_writer.add_scalar(f'{dataset_name}/train_loss_patches/total_loss', loss.item(), iteration)
         tb_writer.add_scalar(f'{dataset_name}/iter_time', elapsed, iteration)
 
-
-    if wandb is not None:
-        wandb.log({"train_l1_loss":Ll1, 'train_total_loss':loss, })
     
     # Report test and samples of training set
     if iteration in testing_iterations:
@@ -249,11 +245,6 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0
                 psnr_test = 0.0
-                
-                if wandb is not None:
-                    gt_image_list = []
-                    render_image_list = []
-                    errormap_list = []
 
                 for idx, viewpoint in enumerate(config['cameras']):
                     scene.gaussians.set_anchor_mask(viewpoint.camera_center, iteration, viewpoint.resolution_scale)
@@ -263,15 +254,9 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
                     if tb_writer and (idx < 30):
                         tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/render".format(viewpoint.image_name), image[None], global_step=iteration)
                         tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/errormap".format(viewpoint.image_name), (gt_image[None]-image[None]).abs(), global_step=iteration)
-
-                        if wandb:
-                            render_image_list.append(image[None])
-                            errormap_list.append((gt_image[None]-image[None]).abs())
                             
                         if iteration == testing_iterations[0]:
                             tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/ground_truth".format(viewpoint.image_name), gt_image[None], global_step=iteration)
-                            if wandb:
-                                gt_image_list.append(gt_image[None])
 
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
@@ -286,8 +271,6 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
                 if tb_writer:
                     tb_writer.add_scalar(f'{dataset_name}/'+config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
                     tb_writer.add_scalar(f'{dataset_name}/'+config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
-                if wandb is not None:
-                    wandb.log({f"{config['name']}_loss_viewpoint_l1_loss":l1_test, f"{config['name']}_PSNR":psnr_test})
 
         if tb_writer:
             # tb_writer.add_histogram(f'{dataset_name}/'+"scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
@@ -365,8 +348,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             t_train_list, visible_count  = render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background)
             train_fps = 1.0 / torch.tensor(t_train_list[5:]).mean()
             logger.info(f'Train FPS: \033[1;35m{train_fps.item():.5f}\033[0m')
-            if wandb is not None:
-                wandb.log({"train_fps":train_fps.item(), })
 
         if not skip_test:
             t_test_list, visible_count = render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background)
@@ -374,8 +355,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             logger.info(f'Test FPS: \033[1;35m{test_fps.item():.5f}\033[0m')
             if tb_writer:
                 tb_writer.add_scalar(f'{dataset_name}/test_FPS', test_fps.item(), 0)
-            if wandb is not None:
-                wandb.log({"test_fps":test_fps, })
     
     return visible_count
 
@@ -429,11 +408,7 @@ def evaluate(model_paths, eval_name, visible_count=None, wandb=None, tb_writer=N
             ssims.append(ssim(renders[idx], gts[idx]))
             psnrs.append(psnr(renders[idx], gts[idx]))
             lpipss.append(lpips_fn(renders[idx], gts[idx]).detach())
-        
-        if wandb is not None:
-            wandb.log({"test_SSIMS":torch.stack(ssims).mean().item(), })
-            wandb.log({"test_PSNR_final":torch.stack(psnrs).mean().item(), })
-            wandb.log({"test_LPIPS":torch.stack(lpipss).mean().item(), })
+
 
         logger.info(f"model_paths: \033[1;35m{model_paths}\033[0m")
         logger.info("  SSIM : \033[1;35m{:>12.7f}\033[0m".format(torch.tensor(ssims).mean(), ".5"))
@@ -525,27 +500,11 @@ if __name__ == "__main__":
         os.system("echo $CUDA_VISIBLE_DEVICES")
         logger.info(f'using GPU {args.gpu}')
 
-    try:
-        saveRuntimeCode(os.path.join(args.model_path, 'backup'))
-    except:
-        logger.info(f'save code failed~')
         
     dataset = args.source_path.split('/')[-1]
     exp_name = args.model_path.split('/')[-2]
-    
-    if args.use_wandb:
-        wandb.login()
-        run = wandb.init(
-            # Set the project where this run will be logged
-            project=f"Octree-GS-{dataset}",
-            name=exp_name,
-            # Track hyperparameters and run metadata
-            settings=wandb.Settings(start_method="fork"),
-            config=vars(args)
-        )
-    else:
-        wandb = None
-    
+
+    wandb = None
     logger.info("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)

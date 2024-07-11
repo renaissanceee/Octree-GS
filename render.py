@@ -31,10 +31,10 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 
-def render_set(model_path, name, iteration, views, gaussians, pipeline, background, show_level, ape_code):
-    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
+def render_set(model_path, name, iteration, views, gaussians, pipeline, background, show_level, ape_code, scale):
+    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_"+scale)
     makedirs(render_path, exist_ok=True)
-    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
+    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_"+scale)
     makedirs(gts_path, exist_ok=True)
     if show_level:
         render_level_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_level")
@@ -59,8 +59,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         per_view_dict['{0:05d}'.format(idx)+".png"] = visible_count.item()
 
         gt = view.original_image[0:3, :, :]
-        torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        torchvision.utils.save_image(rendering, os.path.join(render_path, view.image_name + ".png"))
+        torchvision.utils.save_image(gt, os.path.join(gts_path, view.image_name + ".png"))
 
         if show_level:
             for cur_level in range(gaussians.levels):
@@ -105,10 +105,10 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             os.makedirs(dataset.model_path)
         
         if not skip_train:
-            render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, show_level, ape_code)
+            render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution_scales)
 
         if not skip_test:
-            render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, show_level, ape_code)
+            render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution_scales)
 
 if __name__ == "__main__":
     # Set up command line argument parser
