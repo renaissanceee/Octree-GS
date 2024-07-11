@@ -32,9 +32,9 @@ from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 
 def render_set(model_path, name, iteration, views, gaussians, pipeline, background, show_level, ape_code, scale):
-    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_"+scale)
+    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_{}".format(scale))
     makedirs(render_path, exist_ok=True)
-    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_"+scale)
+    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_{}".format(scale))
     makedirs(gts_path, exist_ok=True)
     if show_level:
         render_level_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_level")
@@ -103,12 +103,10 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
         if not os.path.exists(dataset.model_path):
             os.makedirs(dataset.model_path)
-        
         if not skip_train:
-            render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution_scales)
-
+            render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution)
         if not skip_test:
-            render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution_scales)
+            render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, show_level, ape_code, dataset.resolution)
 
 if __name__ == "__main__":
     # Set up command line argument parser
